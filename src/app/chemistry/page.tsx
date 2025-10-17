@@ -24,15 +24,16 @@ export default function ChemistryPage() {
     []
   );
 
-  // load heats for dropdown
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("heats").select("id, heat_code").order("created_at", { ascending:false });
-      setHeats(data ?? []);
+      const { data, error } = await supabase
+        .from("heats")
+        .select("id,heat_code")
+        .order("created_at", { ascending: false });
+      if (!error) setHeats(data ?? []);
     })();
   }, []);
 
-  // load recent chemistry rows
   async function loadChem() {
     const { data, error } = await supabase
       .from("chemistry")
@@ -42,42 +43,31 @@ export default function ChemistryPage() {
     if (error) setErr(error.message);
     setRows(data ?? []);
   }
-
   useEffect(() => { loadChem(); }, []);
 
-  function numOrNull(v: string) {
-    if (v === undefined || v === null) return null;
+  function numOrNull(v?: string) {
+    if (v == null) return null;
     const t = v.trim();
-    if (t === "") return null;
+    if (!t) return null;
     const n = Number(t);
     return Number.isFinite(n) ? n : null;
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    setErr(""); setMsg("");
-    if (!heatId) { setErr("Pick a Heat."); return; }
-
-    // basic sanity: 0–100 range for each %
-    for (const k of fields) {
-      const v = chem[k];
-      if (v && (Number(v) < 0 || Number(v) > 100)) {
-        setErr(`${k.toUpperCase()} must be between 0 and 100`);
-        return;
-      }
-    }
+    setMsg(""); setErr("");
+    if (!heatId) { setErr("Pick a Heat first"); return; }
 
     const payload: any = { heat_id: heatId };
-    for (const k of fields) payload[k] = numOrNull(chem[k] ?? "");
-
-    payload["others"] = chem["others"]?.trim() || null;
+    for (const k of fields) payload[k] = numOrNull(chem[k]);
+    payload.others = chem.others?.trim() || null;
 
     const { error } = await supabase.from("chemistry").insert(payload);
     if (error) { setErr(error.message); return; }
 
     setMsg("✅ Chemistry saved");
     setChem({});
-    await loadChem();
+    loadChem();
   }
 
   return (
@@ -85,7 +75,6 @@ export default function ChemistryPage() {
       <div className="max-w-5xl mx-auto space-y-6">
         <section className="bg-white rounded-xl shadow p-6">
           <h1 className="text-2xl font-bold mb-4">Chemistry</h1>
-
           {msg && <div className="text-green-700 text-sm mb-3">{msg}</div>}
           {err && <div className="text-red-700 text-sm mb-3">Error: {err}</div>}
 
@@ -99,14 +88,12 @@ export default function ChemistryPage() {
                 required
               >
                 <option value="">Select heat…</option>
-                {heats.map(h => (
-                  <option key={h.id} value={h.id}>{h.heat_code} (#{h.id})</option>
-                ))}
+                {heats.map(h => <option key={h.id} value={h.id}>{h.heat_code} (#{h.id})</option>)}
               </select>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {fields.map((k) => (
+              {fields.map(k => (
                 <div key={k}>
                   <label className="block text-xs font-medium mb-1">{k.toUpperCase()} (%)</label>
                   <input
@@ -153,11 +140,7 @@ export default function ChemistryPage() {
                   <tr key={r.id} className="border-b">
                     <td className="py-2 pr-3">{r.id}</td>
                     <td className="py-2 pr-3">{r.heat_id}</td>
-                    {fields.map(k => (
-                      <td key={k} className="py-2 pr-3">
-                        {(r as any)[k] ?? "—"}
-                      </td>
-                    ))}
+                    {fields.map(k => <td key={k} className="py-2 pr-3">{(r as any)[k] ?? "—"}</td>)}
                     <td className="py-2 pr-3">{r.others ?? "—"}</td>
                     <td className="py-2">{new Date(r.created_at).toLocaleString()}</td>
                   </tr>
@@ -173,3 +156,4 @@ export default function ChemistryPage() {
     </div>
   );
 }
+
